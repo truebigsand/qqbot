@@ -1,5 +1,5 @@
-﻿using Chaldene.Data.Messages.Concretes;
-using Chaldene.Data.Messages;
+﻿using Mirai.Net.Data.Messages.Concretes;
+using Mirai.Net.Data.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;

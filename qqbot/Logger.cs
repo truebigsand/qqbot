@@ -27,7 +27,7 @@ namespace qqbot
             sb.Append(DateTime.Now);
             sb.Append(']');
             sb.Append('[');
-            sb.Append(Enum.GetName(level).ToUpper());
+            sb.Append(Enum.GetName(level)?.ToUpper());
             sb.Append(']');
             sb.Append(content);
             sb.Append('\n');

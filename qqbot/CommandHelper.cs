@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Chaldene.Data.Messages;
-using Chaldene.Sessions;
+using Mirai.Net.Data;
+using Mirai.Net.Data.Messages.Receivers;
+using Mirai.Net.Sessions;
 
 namespace qqbot
 {
-    public delegate Task GroupCommandHandler(MiraiBot bot, Chaldene.Data.Messages.Receivers.GroupMessageReceiver e, string[] args);
+    public delegate Task GroupCommandHandler(GroupMessageReceiver receiver, string[] args);
     public class GroupCommandHelper
     {
         private Dictionary<string, GroupCommandHandler> CommandMap;
@@ -42,7 +43,7 @@ namespace qqbot
         /// <exception cref="KeyNotFoundException"></exception>
         public GroupCommandHandler GetHandler(string name)
         {
-            if (!CommandMap.TryGetValue(name, out GroupCommandHandler handler))
+            if (!CommandMap.TryGetValue(name, out GroupCommandHandler? handler))
             {
                 throw new KeyNotFoundException("command not found!");
             }

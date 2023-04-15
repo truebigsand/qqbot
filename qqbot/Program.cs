@@ -1,12 +1,15 @@
 ﻿using Newtonsoft.Json.Linq;
 using System.Text.Json;
-using Chaldene.Sessions;
-using Chaldene.Data.Messages.Concretes;
-using Chaldene.Data.Messages;
 using System.Net;
 using System.Text;
-using Chaldene.Data.Messages.Receivers;
-using Chaldene.Data.Shared;
+using System.Diagnostics;
+using Mirai.Net.Data.Messages.Receivers;
+using Mirai.Net.Sessions;
+using Mirai.Net.Sessions.Http.Managers;
+using System.Reactive.Linq;
+using Mirai.Net.Data.Messages.Concretes;
+using Mirai.Net.Utils.Scaffolds;
+using Mirai.Net.Data.Messages;
 
 namespace qqbot
 {
@@ -32,7 +35,8 @@ namespace qqbot
             new("统计", CommandHandler.StatisticsHandler),
             new("涩图", CommandHandler.SetuHandler),
             new("个人统计", CommandHandler.PersonalMessageRanksHandler),
-            new("搜图", CommandHandler.SearchImageHandler)
+            new("搜图", CommandHandler.SearchImageHandler),
+            new("测试", CommandHandler.TestHandler)
         });
         private static Dictionary<(string, string), AutoResetEvent> GroupSession = new();
         private static Dictionary<(string, string), GroupMessageReceiver> GroupSessionData = new();
@@ -52,14 +56,18 @@ namespace qqbot
             GlobalData.StartTime = DateTime.Parse(await db.GetInformationAsync("statistics.start_time"));
             Logger.Info("获取统计信息成功!");
 
-            using MiraiBot bot = new MiraiBot("127.0.0.1:8080", "ab0096f1-f9b9-4df3-ab12-5eeef48bf48f", 2628754644);
+            using MiraiBot bot = new MiraiBot()
+            {
+                Address = "127.0.0.1:8080",
+                VerifyKey = "ab0096f1-f9b9-4df3-ab12-5eeef48bf48f",
+                QQ = "2628754644"
+            };
             await bot.LaunchAsync();
             Logger.Info("登录成功!");
             
-            await bot.SendFriendMessageAsync(3244346642L, $"机器人上线[{DateTime.Now}]");
-            
-            
-            bot.GroupMessageReceived += async (sender, e) =>
+            await MessageManager.SendFriendMessageAsync("3244346642", $"机器人上线[{DateTime.Now}]");
+
+            bot.MessageReceived.OfType<GroupMessageReceiver>().Subscribe(async (e) =>
             {
                 string readableString = e.MessageChain.ToReadableString();
                 Logger.Info($"接收到群聊消息: [{e.GroupName}({e.GroupId})][{e.Sender.Name}({e.Sender.Id})]{readableString}");
@@ -76,12 +84,10 @@ namespace qqbot
                 GroupSession[(e.GroupId, e.Sender.Id)].Set();
                 Logger.Warning($"group session updated for ({e.GroupId}, {e.Sender.Id})");
 
-                db.InsertGroupMessageAsync(e, readableString);
-                if (IsAtSelf(sender, e))
-                {
-                    await HandleGroupCommandAsync(sender, e);
-                }
-            };
+                await db.InsertGroupMessageAsync(e, readableString);
+            });
+            bot.MessageReceived.OfType<GroupMessageReceiver>().Where(IsAtSelf)
+                .Subscribe(async receiver => await HandleGroupCommandAsync(receiver));
 
             while (true)
             {
@@ -92,7 +98,7 @@ namespace qqbot
             }
         }
         // MessageChain structure: 0=>source, 1=>at, 2...=> commands
-        private static async Task HandleGroupCommandAsync(MiraiBot sender, GroupMessageReceiver e)
+        private static async Task HandleGroupCommandAsync(GroupMessageReceiver e)
         {
             var messages = e.MessageChain.ToList();
             if(messages == null)
@@ -102,33 +108,34 @@ namespace qqbot
             }
             if(messages.Count == 2)
             {
-                sender.SendGroupMessageAsync(e.GroupId, new PlainMessage("使用方法：@我 指令 [参数]"));
+                await e.SendMessageAsync("使用方法：@我 指令 [参数]");
                 return;
             }
-            SourceMessage source = messages[0] as SourceMessage;
-            var command = (messages[2] as PlainMessage)?.Text?.Trim().Split(' ').Where(x => x != string.Empty).ToArray();
+            SourceMessage source = (messages[0] as SourceMessage)!;
+            var command = (messages[2] as PlainMessage)?.Text?.Trim().Split(' ').Where(x => x != string.Empty).ToArray()!;
             if (command.Length == 0)
             {
-                sender.SendGroupMessageAsync(e.GroupId, new PlainMessage("使用方法：@我 指令 [参数]"));
+                await e.SendMessageAsync("使用方法：@我 指令 [参数]");
                 return;
             }
             string commandIdentity = command[0];
             try
             {
                 var handler = GroupCommandHelper.GetHandler(commandIdentity);
-                handler(sender, e, command[1..^0]);
+                await handler(e, command[1..^0]);
             }
             catch (KeyNotFoundException)
             {
-                sender.SendGroupMessageAsync(e.GroupId, new PlainMessage("使用方法：@我 指令 [参数]"));
+                await e.SendMessageAsync("使用方法：@我 指令 [参数]");
             }
         }
-        private static bool IsAtSelf(MiraiBot sender, GroupMessageReceiver e)
+        private static bool IsAtSelf(GroupMessageReceiver e)
         {
-            return e.MessageChain.Skip(1).First() is AtMessage message && message.Target == sender.QQ;
+            return e.MessageChain.Skip(1).First() is AtMessage message && message.Target == e.Sender.Id;
         }
         public static class CommandHandler
         {
+            private static HttpClient httpClient = new HttpClient();
             private static GroupMessageReceiver WaitForNextMessage(GroupMessageReceiver e)
             {
                 var are = GroupSession[(e.GroupId, e.Sender.Id)];
@@ -136,9 +143,9 @@ namespace qqbot
                 are.WaitOne();
                 return GroupSessionData[(e.GroupId, e.Sender.Id)];
             }
-            public static async Task StatusHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
+            public static async Task StatusHandler(GroupMessageReceiver e, string[] args)
             {
-                SourceMessage source = e.MessageChain.First() as SourceMessage;
+                SourceMessage source = (e.MessageChain.First() as SourceMessage)!;
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("当前状态：");
                 TimeSpan latency = DateTime.Now - DateTimeConverter.ToDateTime(source.Time);
@@ -148,9 +155,9 @@ namespace qqbot
                 sb.AppendLine($"接收的消息：{await GlobalData.db.GetMessageCountAsync()}条");
                 sb.Append($"处理的消息：{await GlobalData.db.GetHandledMessageCountAsync()}条");
 
-                bot.SendGroupMessageAsync(e.GroupId, new PlainMessage(sb.ToString()));
+                await e.SendMessageAsync(sb.ToString());
             }
-            public static async Task StatisticsHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
+            public static async Task StatisticsHandler(GroupMessageReceiver e, string[] args)
             {
                 var sb = new StringBuilder();
                 sb.AppendLine($"消息统计(自{GlobalData.StartTime.ToString("yyyy-MM-dd HH:mm:ss")}以来)：");
@@ -160,33 +167,33 @@ namespace qqbot
                 {
                     sb.AppendLine($"{rank.Name}({rank.Id}): {rank.Count}条");
                 }
-                bot.SendGroupMessageAsync(e.GroupId, new PlainMessage(sb.ToString().TrimEnd()));
+                await e.SendMessageAsync(sb.ToString().TrimEnd());
             }
-            public static async Task SetuHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
+            public static async Task SetuHandler(GroupMessageReceiver e, string[] args)
             {
                 int count = 1;
                 if (args.Length == 1)
                 {
                     if (!int.TryParse(args[0], out int _count) || _count < 1 || _count > 5)
                     {
-                        bot.SendGroupMessageAsync(e.GroupId, new PlainMessage("参数必须是[1,5]的整数"));
+                        await e.SendMessageAsync("参数必须是[1,5]的整数");
                         return;
                     }
                     count = _count;
                 }
                 for (int i = 0; i < count; i++)
                 {
-                    bot.SendGroupMessageAsync(e.GroupId, new ImageMessage() { Url = "https://api.anosu.top/img/" });
+                    _ = e.SendMessageAsync(new ImageMessage() { Url = "https://api.anosu.top/img/" });
                 }
             }
-            public static async Task PersonalMessageRanksHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
+            public static async Task PersonalMessageRanksHandler(GroupMessageReceiver e, string[] args)
             {
                 int limit = 10;
                 if (args.Length == 1)
                 {
                     if (!int.TryParse(args[0], out int _limit) || _limit < 1 || _limit > 20)
                     {
-                        bot.SendGroupMessageAsync(e.GroupId, new PlainMessage("参数必须是[1,20]的整数"));
+                        await e.SendMessageAsync("参数必须是[1,20]的整数");
                         return;
                     }
                     limit = _limit;
@@ -198,33 +205,90 @@ namespace qqbot
                 {
                     sb.AppendLine($"{rank.Content}: {rank.Count}条");
                 }
-                bot.SendGroupMessageAsync(e.GroupId, new PlainMessage(sb.ToString().TrimEnd()));
+                await e.SendMessageAsync(sb.ToString().TrimEnd());
             }
-            public static async Task SearchImageHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
+            public static async Task SearchImageHandler(GroupMessageReceiver e, string[] args)
             {
+                await e.SendMessageAsync(new MessageChainBuilder().At(e.Sender).Plain(" 请发送要识别的图片").Build());
+                Logger.Debug("wait for image");
                 e = WaitForNextMessage(e);
-                if (e.MessageChain.Skip(1).Take(1).Single() is not ImageMessage)
+                Logger.Debug("received message");
+                var message = e.MessageChain.Skip(1).Take(1).Single();
+                string url = string.Empty;
+                if (message is ImageMessage imageMessage)
                 {
-                    bot.SendGroupMessageAsync(e.GroupId, new AtMessage(e.Sender), " 请发送一张图片！");
-                    return;
+                    url = imageMessage.Url;
                 }
-                
-            }
-            public static async Task TestHandler(MiraiBot bot, GroupMessageReceiver e, string[] args)
-            {
-                await bot.SendGroupMessageAsync(e.GroupId, new PlainMessage("1"));
-                Logger.Warning("waiting for session");
-                e = WaitForNextMessage(e);
-                if ((e.MessageChain.Skip(1).Take(1).Single() as PlainMessage).Text == "2")
+                else if (message is FileMessage fileMessage)
                 {
-                    bot.SendGroupMessageAsync(e.GroupId, "is 2");
+                    Logger.Debug("waiting for file link");
+                    var file = await FileManager.GetFileAsync(e.GroupId, fileMessage.FileId, true);
+                    url = file.DownloadInfo.Url;
                 }
                 else
                 {
-                    bot.SendGroupMessageAsync(e.GroupId, "not 2");
+                    await e.SendMessageAsync(new MessageChainBuilder().At(e.Sender).Plain(" 你发了甚么啊（恼").Build());
+                    return;
+                }
+                Logger.Debug($"获取到image链接：{url}");
+                string api_url = "https://proxy.truebigsand.top/https://saucenao.com/search.php?api_key=14c88397ab04c3f51ebe81ccfde020cfd4fbc5c8&db=999&&url=" + url;
+                var builder = new MessageChainBuilder();
+                try
+                {
+                    string jsonStr = await httpClient.GetStringAsync(api_url);
+                    var json = JObject.Parse(jsonStr);
+                    var header = json["results"]!["header"]!;
+                    var data = json["results"]!["data"]!;
+                    string similarity = header.Value<string>("similarity")!;
+                    string thumbnail = header.Value<string>("thumbnail")!;
+                    int index_id = header.Value<int>("index_id");
+                    string index_name = header.Value<string>("index_name")!;
+                    string link = data["ext_urls"]![0]!.ToObject<string>()!;
+
+                    builder.ImageFromUrl(thumbnail);
+                    builder.Plain($"相似度：{similarity}\n");
+                    builder.Plain($"来源：{index_name}\n");
+                    builder.Plain($"链接：{link}\n");
+                    if (index_id == 5) // Pixiv
+                    {
+                        string title = header.Value<string>("title")!;
+                        int pixiv_id = header.Value<int>("pixiv_id");
+                        string member_name = header.Value<string>("member_name")!;
+                        int member_id = header.Value<int>("member_id");
+                        builder.Plain($"标题：{title}\n");
+                        builder.Plain($"作品ID：{pixiv_id}\n");
+                        builder.Plain($"画师：{member_name}\n");
+                        builder.Plain($"画师ID：{member_id}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await e.SendMessageAsync("发生内部错误：\n" + ex.Message);
+                    return;
+                }
+                await MessageManager.SendGroupMessageAsync(e.GroupId, builder.Build());
+            }
+            public static async Task TestHandler(GroupMessageReceiver e, string[] args)
+            {
+                await MessageManager.SendGroupMessageAsync(e.GroupId, new PlainMessage("1"));
+                Logger.Debug("waiting for session");
+                e = WaitForNextMessage(e);
+                if ((e.MessageChain.Skip(1).Take(1).Single() as PlainMessage)?.Text == "2")
+                {
+                    await e.SendMessageAsync("is 2");
+                }
+                else
+                {
+                    await e.SendMessageAsync("not 2");
                 }
             }
         }
     }
-    
+    public static class MessageReceiverExtensions
+    {
+        public static Task<string> SendMessageAsync(this MessageReceiverBase receiver, params MessageBase[] messages)
+        {
+            return receiver.SendMessageAsync(messages);
+        }
+    }
 }

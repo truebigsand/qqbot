@@ -11,12 +11,12 @@ namespace qqbot
     public class MessageRankItem
     {
         public long Id { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public int Count { get; set; }
     }
     public class PersonalMessageRankItem
     {
-        public string Content { get; set; }
+        public string Content { get; set; } = string.Empty;
         public int Count { get; set; }
     }
     public class DbHelper : IDisposable
@@ -69,15 +69,15 @@ namespace qqbot
             command.Parameters.AddWithValue("@value", value);
             return await command.ExecuteNonQueryAsync();
         }
-        public async Task<int> InsertGroupMessageAsync(Chaldene.Data.Messages.Receivers.GroupMessageReceiver e, string readableString)
+        public async Task<int> InsertGroupMessageAsync(Mirai.Net.Data.Messages.Receivers.GroupMessageReceiver e, string readableString)
         {
             CheckConnection();
             using var command = connection.CreateCommand();
             command.CommandType = CommandType.Text;
             command.CommandText = "INSERT INTO group_message (time, group_id, group_name, sender_id, sender_name, content)"
                 + "VALUES (@time, @group_id, @group_name, @sender_id, @sender_name, @content)";
-            var source = e.MessageChain.First() as Chaldene.Data.Messages.Concretes.SourceMessage;
-            command.Parameters.AddWithValue("@time", DateTimeConverter.ToDateTime(source.Time).ToString("yyyy-MM-dd HH:mm:ss"));
+            var source = e.MessageChain.First() as Mirai.Net.Data.Messages.Concretes.SourceMessage;
+            command.Parameters.AddWithValue("@time", DateTimeConverter.ToDateTime(source!.Time).ToString("yyyy-MM-dd HH:mm:ss"));
             command.Parameters.AddWithValue("@group_id", e.GroupId);
             command.Parameters.AddWithValue("@group_name", e.GroupName);
             command.Parameters.AddWithValue("@sender_id", e.Sender.Id);
