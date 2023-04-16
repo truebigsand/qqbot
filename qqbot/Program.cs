@@ -10,12 +10,14 @@ using System.Reactive.Linq;
 using Mirai.Net.Data.Messages.Concretes;
 using Mirai.Net.Utils.Scaffolds;
 using Mirai.Net.Data.Messages;
+using System.Reactive;
 
 namespace qqbot
 {
     static class GlobalData
     {
         public static DateTime StartTime { get; set; }
+        public static string BotQQ { get; set; } = string.Empty;
         public static DbHelper db = new DbHelper(builder =>
         {
             builder.Server = "192.168.0.103";
@@ -41,51 +43,50 @@ namespace qqbot
         private static Dictionary<(string, string), AutoResetEvent> GroupSession = new();
         private static Dictionary<(string, string), GroupMessageReceiver> GroupSessionData = new();
         // "Server=192.168.0.103; Username=root; Password=feifei070926; Database=qqbot"
-        private static DbHelper db = new DbHelper(builder =>
-        {
-            builder.Server = "192.168.0.103";
-            builder.UserID = "root";
-            builder.Password = "feifei070926";
-            builder.Database = "qqbot";
 
-            // seconds for tcp connection to keep alive (0 for not keep alive)
-            // builder.Keepalive = ;
-        });
         static async Task Main(string[] args)
         {
-            GlobalData.StartTime = DateTime.Parse(await db.GetInformationAsync("statistics.start_time"));
+            GlobalData.StartTime = DateTime.Parse(await GlobalData.db.GetInformationAsync("statistics.start_time"));
+            GlobalData.BotQQ = await GlobalData.db.GetInformationAsync("bot.qq");
+
             Logger.Info("获取统计信息成功!");
 
             using MiraiBot bot = new MiraiBot()
             {
-                Address = "127.0.0.1:8080",
-                VerifyKey = "ab0096f1-f9b9-4df3-ab12-5eeef48bf48f",
-                QQ = "2628754644"
+                Address = await GlobalData.db.GetInformationAsync("mirai.address"),
+                VerifyKey = await GlobalData.db.GetInformationAsync("mirai.verify_key"),
+                QQ = GlobalData.BotQQ
             };
             await bot.LaunchAsync();
             Logger.Info("登录成功!");
             
             await MessageManager.SendFriendMessageAsync("3244346642", $"机器人上线[{DateTime.Now}]");
 
-            bot.MessageReceived.OfType<GroupMessageReceiver>().Subscribe(async (e) =>
+            // Insert to database and log
+            bot.MessageReceived.OfType<GroupMessageReceiver>().Subscribe(async receiver =>
             {
-                string readableString = e.MessageChain.ToReadableString();
-                Logger.Info($"接收到群聊消息: [{e.GroupName}({e.GroupId})][{e.Sender.Name}({e.Sender.Id})]{readableString}");
-
-                if (!GroupSession.ContainsKey((e.GroupId, e.Sender.Id)))
-                {
-                    GroupSession.Add((e.GroupId, e.Sender.Id), new AutoResetEvent(false));
-                }
-                if (!GroupSessionData.ContainsKey((e.GroupId, e.Sender.Id)))
-                {
-                    GroupSessionData.Add((e.GroupId, e.Sender.Id), new GroupMessageReceiver());
-                }
-                GroupSessionData[(e.GroupId, e.Sender.Id)] = e;
-                GroupSession[(e.GroupId, e.Sender.Id)].Set();
-                Logger.Warning($"group session updated for ({e.GroupId}, {e.Sender.Id})");
-
-                await db.InsertGroupMessageAsync(e, readableString);
+                string readableString = receiver.MessageChain.ToReadableString();
+                Logger.Info($"接收到群聊消息: [{receiver.GroupName}({receiver.GroupId})][{receiver.Sender.Name}({receiver.Sender.Id})]{readableString}");
+                await GlobalData.db.InsertGroupMessageAsync(receiver, readableString);
             });
+
+            // Update group session
+            bot.MessageReceived.OfType<GroupMessageReceiver>().Subscribe(receiver =>
+            {
+                if (!GroupSession.ContainsKey((receiver.GroupId, receiver.Sender.Id)))
+                {
+                    GroupSession.Add((receiver.GroupId, receiver.Sender.Id), new AutoResetEvent(false));
+                }
+                if (!GroupSessionData.ContainsKey((receiver.GroupId, receiver.Sender.Id)))
+                {
+                    GroupSessionData.Add((receiver.GroupId, receiver.Sender.Id), new GroupMessageReceiver());
+                }
+                GroupSessionData[(receiver.GroupId, receiver.Sender.Id)] = receiver;
+                GroupSession[(receiver.GroupId, receiver.Sender.Id)].Set();
+                Logger.Warning($"group session updated for ({receiver.GroupId}, {receiver.Sender.Id})");  
+            });
+
+            // Handle group command
             bot.MessageReceived.OfType<GroupMessageReceiver>().Where(IsAtSelf)
                 .Subscribe(async receiver => await HandleGroupCommandAsync(receiver));
 
@@ -131,7 +132,7 @@ namespace qqbot
         }
         private static bool IsAtSelf(GroupMessageReceiver e)
         {
-            return e.MessageChain.Skip(1).First() is AtMessage message && message.Target == e.Sender.Id;
+            return e.MessageChain.Skip(1).First() is AtMessage message && message.Target == GlobalData.BotQQ;
         }
         public static class CommandHandler
         {
@@ -231,39 +232,54 @@ namespace qqbot
                     return;
                 }
                 Logger.Debug($"获取到image链接：{url}");
-                string api_url = "https://proxy.truebigsand.top/https://saucenao.com/search.php?api_key=14c88397ab04c3f51ebe81ccfde020cfd4fbc5c8&db=999&&url=" + url;
+                string api_url = "https://proxy.truebigsand.top/https://saucenao.com/search.php?api_key=14c88397ab04c3f51ebe81ccfde020cfd4fbc5c8&db=999&output_type=2&url=" + url;
                 var builder = new MessageChainBuilder();
                 try
                 {
                     string jsonStr = await httpClient.GetStringAsync(api_url);
+                    Logger.Info(jsonStr);
                     var json = JObject.Parse(jsonStr);
-                    var header = json["results"]!["header"]!;
-                    var data = json["results"]!["data"]!;
+                    var header = json["results"]![0]!["header"]!;
+                    var data = json["results"]![0]!["data"]!;
                     string similarity = header.Value<string>("similarity")!;
                     string thumbnail = header.Value<string>("thumbnail")!;
                     int index_id = header.Value<int>("index_id");
                     string index_name = header.Value<string>("index_name")!;
-                    string link = data["ext_urls"]![0]!.ToObject<string>()!;
-
-                    builder.ImageFromUrl(thumbnail);
+                    
+                    builder.ImageFromUrl("https://proxy.truebigsand.top/" + thumbnail);
                     builder.Plain($"相似度：{similarity}\n");
                     builder.Plain($"来源：{index_name}\n");
-                    builder.Plain($"链接：{link}\n");
+                    if (index_id != 18 && index_id != 38) // not nhentai or ehentai
+                    {
+                        string link = data["ext_urls"]![0]!.ToObject<string>()!;
+                        builder.Plain($"链接：{link}\n");
+                    }
+                    
                     if (index_id == 5) // Pixiv
                     {
-                        string title = header.Value<string>("title")!;
-                        int pixiv_id = header.Value<int>("pixiv_id");
-                        string member_name = header.Value<string>("member_name")!;
-                        int member_id = header.Value<int>("member_id");
+                        string title = data.Value<string>("title")!;
+                        int pixiv_id = data.Value<int>("pixiv_id");
+                        string member_name = data.Value<string>("member_name")!;
+                        int member_id = data.Value<int>("member_id");
                         builder.Plain($"标题：{title}\n");
                         builder.Plain($"作品ID：{pixiv_id}\n");
                         builder.Plain($"画师：{member_name}\n");
                         builder.Plain($"画师ID：{member_id}");
                     }
+                    else if (index_id == 18 || index_id == 38) // nhentai or ehentai
+                    {
+                        string source = data.Value<string>("source")!;
+                        string jp_name = data.Value<string>("jp_name")!;
+                        builder.Plain($"标题：{source}\n");
+                        builder.Plain($"原标题：{jp_name}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    await e.SendMessageAsync("发生内部错误：\n" + ex.Message);
+                    Logger.Error(ex.Message);
+                    
+                    long error_id = await GlobalData.db.InsertBotErrorAsync(e, ex.Message);
+                    await e.SendMessageAsync($"发生内部错误，错误ID: {error_id}");
                     return;
                 }
                 await MessageManager.SendGroupMessageAsync(e.GroupId, builder.Build());
@@ -282,13 +298,6 @@ namespace qqbot
                     await e.SendMessageAsync("not 2");
                 }
             }
-        }
-    }
-    public static class MessageReceiverExtensions
-    {
-        public static Task<string> SendMessageAsync(this MessageReceiverBase receiver, params MessageBase[] messages)
-        {
-            return receiver.SendMessageAsync(messages);
         }
     }
 }

@@ -85,6 +85,20 @@ namespace qqbot
             command.Parameters.AddWithValue("@content", readableString);
             return await command.ExecuteNonQueryAsync();
         }
+        public async Task<long> InsertBotErrorAsync(Mirai.Net.Data.Messages.Receivers.GroupMessageReceiver e, string content)
+        {
+            CheckConnection();
+            using var command = connection.CreateCommand();
+            command.CommandType = CommandType.Text;
+            command.CommandText = "INSERT INTO bot_error (time, message, content)"
+                + "VALUES (@time, @message, @content)";
+            var source = e.MessageChain.First() as Mirai.Net.Data.Messages.Concretes.SourceMessage;
+            command.Parameters.AddWithValue("@time", DateTimeConverter.ToDateTime(source!.Time).ToString("yyyy-MM-dd HH:mm:ss"));
+            command.Parameters.AddWithValue("@message", e.MessageChain.ToReadableString());
+            command.Parameters.AddWithValue("@content", content);
+            await command.ExecuteNonQueryAsync();
+            return command.LastInsertedId;
+        }
         public async IAsyncEnumerable<MessageRankItem> GetMessageRanksAsync(string GroupId)
         {
             CheckConnection();
