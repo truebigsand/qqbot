@@ -34,7 +34,7 @@ public class GroupSessionData
 
 public static class GlobalData
 {
-    public static AppSettings settings;
+    public static AppSettings Settings;
     public static MongoClient mongoClient;
     public static IMongoDatabase db;
     public static IMongoCollection<MessageRecord> messagesCollection;
@@ -42,26 +42,22 @@ public static class GlobalData
     public static IMongoCollection<GroupCommandRecord> commandsCollection;
     public static Dictionary<(long, long), GroupSessionData> GroupSession = new();
 
-    public static DateTime StartTime;
-    public static string FriendRequestKey = string.Empty;
-    public static int SetuLimit;
-    public static int PersonalMessageRankLimit;
     public static long LoginUserId;
     public static string LoginUserName = string.Empty;
 
-    public static Dictionary<string, (GroupCommandHandler handler, bool isEnabled)> GroupCommandMap = new(new List<KeyValuePair<string, (GroupCommandHandler handler, bool isEnabled)>>
-    {
-        new("状态", (GroupCommandHandlers.StatusHandler, true)),
-        new("统计", (GroupCommandHandlers.StatisticsHandler, true)),
-        new("涩图", (GroupCommandHandlers.SetuHandler, true)),
-        new("个人统计", (GroupCommandHandlers.PersonalMessageRanksHandler, true)),
-        new("搜图", (GroupCommandHandlers.SearchImageHandler, true)),
-        new("测试", (GroupCommandHandlers.TestHandler, true)),
-        new("消息结构", (GroupCommandHandlers.MessageStructureHandler, true)),
-        new("enable", (GroupCommandHandlers.CommandEnableHandler, true)),
-        new("disable", (GroupCommandHandlers.CommandDisableHandler, true)),
-        new("指令状态", (GroupCommandHandlers.CommandStatusHandler, true)),
-    });
+    //public static Dictionary<string, (GroupCommandHandler handler, bool isEnabled)> GroupCommandMap = new(new List<KeyValuePair<string, (GroupCommandHandler handler, bool isEnabled)>>
+    //{
+    //    new("状态", (GroupCommandHandlers.StatusHandler, true)),
+    //    new("统计", (GroupCommandHandlers.StatisticsHandler, true)),
+    //    new("涩图", (GroupCommandHandlers.SetuHandler, true)),
+    //    new("个人统计", (GroupCommandHandlers.PersonalMessageRanksHandler, true)),
+    //    new("搜图", (GroupCommandHandlers.SearchImageHandler, true)),
+    //    new("测试", (GroupCommandHandlers.TestHandler, true)),
+    //    new("消息结构", (GroupCommandHandlers.MessageStructureHandler, true)),
+    //    new("enable", (GroupCommandHandlers.CommandEnableHandler, true)),
+    //    new("disable", (GroupCommandHandlers.CommandDisableHandler, true)),
+    //    new("指令状态", (GroupCommandHandlers.CommandStatusHandler, true)),
+    //});
 }
 
 public class Program
@@ -72,19 +68,14 @@ public class Program
            .EnableConsoleOutput()
            .SetLogLevel(LogLevel.Info);
 
+        GlobalData.Settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText("config.json"))!;
         //实例化Sora服务
         ISoraService service = SoraServiceFactory.CreateService(new ClientConfig()
         {
-            Host = "192.168.1.114",
-            Port = 8081,
-            SuperUsers = [3244346642L, 194622214L]
+            Host = GlobalData.Settings.Config.OneBotHost,
+            Port = GlobalData.Settings.Config.OneBotPort,
+            SuperUsers = GlobalData.Settings.Config.SuperUsers
         });
-        // initialize settings
-        GlobalData.settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(File.ReadAllText("appsettings.json"))!;
-        GlobalData.StartTime = DateTime.Parse(GlobalData.settings.Store["StartTime"]);
-        GlobalData.FriendRequestKey = GlobalData.settings.Store["FriendRequestKey"];
-        GlobalData.SetuLimit = int.Parse(GlobalData.settings.Store["SetuLimit"]);
-        GlobalData.PersonalMessageRankLimit = int.Parse(GlobalData.settings.Store["PersonalMessageRankLimit"]);
         service.Event.OnClientConnect += async (s, e) =>
         {
             GlobalData.LoginUserId = e.LoginUid;
@@ -99,7 +90,7 @@ public class Program
             }
         };
         // initialize mongodb
-        GlobalData.mongoClient = new MongoClient(GlobalData.settings.ConnectionStrings["MongoDB"]);
+        GlobalData.mongoClient = new MongoClient(GlobalData.Settings.ConnectionStrings["MongoDB"]);
         GlobalData.db = GlobalData.mongoClient.GetDatabase("qqbot");
         GlobalData.messagesCollection = GlobalData.db.GetCollection<MessageRecord>("messages");
         GlobalData.exceptionsCollection = GlobalData.db.GetCollection<ExceptionRecord>("exceptions");
@@ -140,7 +131,7 @@ public class Program
 
         service.Event.OnFriendRequest += async (s, e) =>
         {
-            if (e.Comment == GlobalData.FriendRequestKey)
+            if (e.Comment == GlobalData.Settings.Config.FriendRequestKey)
             {
                 await e.Accept();
             }
