@@ -23,7 +23,6 @@ public class Program
         builder.Services.AddSingleton<MongoClient>(provider =>
             {
                 var settings = MongoClientSettings.FromConnectionString(builder.Configuration["ConnectionStrings:MongoDB"]);
-                settings.LinqProvider = MongoDB.Driver.Linq.LinqProvider.V3;
                 return new MongoClient(settings);
             });
         builder.Services.AddSingleton<CommandListCacheService>();
