@@ -1,8 +1,7 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Bson;
-using System.ComponentModel.DataAnnotations;
-using Lagrange.Core.Event;
+﻿using Lagrange.Core.Event;
 using Lagrange.Core.Event.EventArg;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace ChangXingGeRevived.Models;
 
@@ -13,17 +12,14 @@ public enum MessageSource
 
 public class MessageRecord
 {
-    [BsonId]
     [Key]
-    public ObjectId Id { get; set; }
-    //[BsonRepresentation(BsonType.Int64)]
+    public int Id { get; set; }
     public ulong SenderId { get; set; }
     public string SenderName { get; set; } = string.Empty;
     public ulong MessageId { get; set; }
     public ulong GroupId { get; set; }
     public string RawText { get; set; } = string.Empty;
     public string? DetailedText { get; set; } = null;
-    [BsonDateTimeOptions(Kind = DateTimeKind.Local)]
     public DateTime Time { get; set; }
     public MessageSource MessageSource { get; set; }
     public static MessageRecord FromEvent(EventBase e) => e switch

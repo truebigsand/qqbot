@@ -3,6 +3,7 @@ using ChangXingGeRevived.Extensions;
 using ChangXingGeRevived.Models;
 using Lagrange.Core;
 using Lagrange.Core.Event.EventArg;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text;
 
@@ -34,15 +35,16 @@ public class PersonalMessageRanksHandler : ICommandHandler
             }
             limit = _limit;
         }
-        var result = _db.MessageRecords
-            .AsEnumerable() // Load all into memory(only for mongodb)
-            .Where(x => x.GroupId == e.Chain.GroupUin && x.SenderId == e.Chain.GroupMemberInfo?.Uin)
+        var result = _db.MessageRecords.AsNoTracking()
+            .Select(x => new {x.GroupId, x.SenderId, x.RawText})
+            .Where(x => x.GroupId == e.Chain.GroupUin && x.SenderId == e.Chain.GroupMemberInfo!.Uin)
             .GroupBy(x => x.RawText)
-            .Select(g => new { Content = g.First().RawText, Name = g.First().SenderName, Count = g.Count() })
+            .Select(g => new { Content = g.Key, Count = g.Count() })
             .OrderByDescending(x => x.Count)
             .Take(limit);
+        
         var sb = new StringBuilder();
-        sb.AppendLine($"{result.First().Name}在本群的个人消息统计(自{_config.BotConfig.StartTime:yyyy-MM-dd HH:mm:ss}以来)：");
+        sb.AppendLine($"在本群的个人消息统计(自{_config.BotConfig.StartTime:yyyy-MM-dd HH:mm:ss}以来)：");
         sb.AppendLine($"共{_db.MessageRecords.Count(x => x.GroupId == e.Chain.GroupUin && x.SenderId == e.Chain.GroupMemberInfo!.Uin)}条消息");
         foreach (var rank in result)
         {

@@ -114,7 +114,7 @@ public class BotService : IHostedService
         if (qrCode != null)
         {
             await File.WriteAllBytesAsync("qr.png", qrCode.Value.QrCode);
-            QrCodeHelper.PrintToConsole(qrCode.Value.Url, true);
+            QrCodeHelper.PrintToConsole(qrCode.Value.Url, false);
             await bot.LoginByQrCode();
         }
         _bot = bot;

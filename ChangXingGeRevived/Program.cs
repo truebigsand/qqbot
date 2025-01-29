@@ -5,7 +5,6 @@ using ChangXingGeRevived.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using MongoDB.Driver;
 
 namespace ChangXingGeRevived;
 
@@ -20,11 +19,6 @@ public class Program
 
         builder.Services.Configure<AppConfig>(builder.Configuration.GetSection("AppConfig"));
 
-        builder.Services.AddSingleton<MongoClient>(provider =>
-            {
-                var settings = MongoClientSettings.FromConnectionString(builder.Configuration["ConnectionStrings:MongoDB"]);
-                return new MongoClient(settings);
-            });
         builder.Services.AddSingleton<CommandListCacheService>();
         builder.Services.AddSingleton<GroupCommandDispatcherService>();
         builder.Services.AddSingleton<GroupSessionService>();
@@ -38,8 +32,12 @@ public class Program
 
         builder.Services.AddDbContext<BotDbContext>((provider, optionsBuilder) =>
         {
-            var mongoClient = provider.GetService<MongoClient>()!;
-            optionsBuilder.UseMongoDB(mongoClient, "qqbot");
+            var connectionString = builder.Configuration["ConnectionStrings:MySQL"];
+            if (connectionString is null)
+            {
+                throw new ArgumentNullException("MySQL connection string cannot be null!");
+            }
+            optionsBuilder.UseMySQL(connectionString);
         });
 
         var host = builder.Build();

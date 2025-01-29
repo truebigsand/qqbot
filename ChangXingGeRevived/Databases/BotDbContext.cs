@@ -1,7 +1,6 @@
 ﻿using ChangXingGeRevived.Models;
 using Microsoft.EntityFrameworkCore;
-using MongoDB.EntityFrameworkCore.Extensions;
-
+using MySql.EntityFrameworkCore;
 namespace ChangXingGeRevived.Databases;
 
 public class BotDbContext(DbContextOptions options) : DbContext(options)
@@ -13,8 +12,8 @@ public class BotDbContext(DbContextOptions options) : DbContext(options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<ExceptionRecord>().ToCollection("exceptions");
-        modelBuilder.Entity<CommandRecord>().ToCollection("commands");
-        modelBuilder.Entity<MessageRecord>().ToCollection("messages");
+        modelBuilder.Entity<ExceptionRecord>().ToTable("exceptions");
+        modelBuilder.Entity<CommandRecord>().ToTable("commands");
+        modelBuilder.Entity<MessageRecord>().ToTable("messages");
     }
 }

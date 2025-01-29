@@ -7,7 +7,6 @@ using Lagrange.Core.Event.EventArg;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Collections.Generic;
-using MongoDB.Driver.Linq;
 
 namespace ChangXingGeRevived.CommandHandlers;
 
@@ -28,7 +27,6 @@ public class StatisticsHandler : ICommandHandler
     public async Task HandleGroupAsync(BotContext bot, GroupMessageEvent e, string[] args)
     {
         var result = _db.MessageRecords
-            .AsEnumerable() // Load all into memory(only for mongodb)
             .Select(x => new { x.GroupId, x.SenderName, x.SenderId })
             .Where(x => x.GroupId == e.Chain.GroupUin)
             .GroupBy(x => x.SenderId)
@@ -43,4 +41,24 @@ public class StatisticsHandler : ICommandHandler
         }
         await e.ReplyAsync(bot, sb.ToString().TrimEnd());
     }
+    /* FetchMembers not working
+     public async Task HandleGroupAsync(BotContext bot, GroupMessageEvent e, string[] args)
+    {
+        var result = _db.MessageRecords.AsNoTracking()
+            .Select(x => new { x.GroupId, x.SenderId })
+            .Where(x => x.GroupId == e.Chain.GroupUin)
+            .GroupBy(x => x.SenderId)
+            .Select(g => new { Id = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count);
+        var sb = new StringBuilder();
+        sb.AppendLine($"消息统计(自{_config.BotConfig.StartTime:yyyy-MM-dd HH:mm:ss}以来)：");
+        sb.AppendLine($"共{_db.MessageRecords.Count(x => x.GroupId == e.Chain.GroupUin)}条消息");
+        var members = await bot.FetchMembers((uint)e.Chain.GroupUin!); // (*)
+        foreach (var rank in result)
+        {
+            sb.AppendLine($"{members.Single(m => m.Uin == rank.Id).MemberName}({rank.Id})：{rank.Count}条");
+        }
+        await e.ReplyAsync(bot, sb.ToString().TrimEnd());
+    }
+     */
 }
