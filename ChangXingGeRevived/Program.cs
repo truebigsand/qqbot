@@ -16,6 +16,7 @@ public class Program
 
         builder.Services.AddHostedService<BotService>();
         builder.Services.AddHostedService<GlobalExceptionHandlerService>();
+        builder.Services.AddHostedService<CommandListUpdateService>();
 
         builder.Services.Configure<AppConfig>(builder.Configuration.GetSection("AppConfig"));
 
@@ -28,6 +29,7 @@ public class Program
         builder.Services.AddTransient<SetuHandler>();
         builder.Services.AddTransient<StatisticsHandler>();
         builder.Services.AddTransient<PersonalMessageRanksHandler>();
+        builder.Services.AddTransient<SigninHandler>();
         builder.Services.AddTransient<TestHandler>();
 
         builder.Services.AddDbContext<BotDbContext>((provider, optionsBuilder) =>

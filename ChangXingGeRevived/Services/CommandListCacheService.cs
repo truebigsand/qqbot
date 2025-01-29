@@ -13,7 +13,7 @@ public class CommandListCacheService
     {
         _db = botDbContext;
     }
-    private void RefreshCache()
+    public void FetchAllFromDatabase()
     {
         _commandRecordCache.Clear();
         foreach (var commandRecord in _db.CommandRecords)
@@ -28,7 +28,7 @@ public class CommandListCacheService
     {
         if (_commandRecordCache.IsEmpty)
         {
-            RefreshCache();
+            FetchAllFromDatabase();
         }
         return _commandRecordCache.TryGetValue(keyword, out record);
     }
@@ -36,7 +36,7 @@ public class CommandListCacheService
     {
         if (_commandRecordCache.IsEmpty)
         {
-            RefreshCache();
+            FetchAllFromDatabase();
         }
         if (!_commandRecordCache.TryUpdate(record.Keyword, record, _commandRecordCache[record.Keyword]))
         {
