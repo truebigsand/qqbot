@@ -90,9 +90,10 @@ public class BotService : IHostedService
             _groupSessionService.Update((uint)e.Chain.GroupUin!, e.Chain.GroupMemberInfo!.Uin, e);
             if (e.Chain.GroupMemberInfo?.Uin != bot.BotUin)
             {
-                Task.Run(() => _groupDispatcher.DispatchAsync(bot, e));
+                Task.Run(() => { _groupDispatcher.DispatchAsync(bot, e).Wait(); });
             }
-            var db = _serviceProvider.GetService<BotDbContext>() ?? throw new Exception("DbContext not found in service provider");
+            using var db = _serviceProvider.CreateScope().ServiceProvider.GetService<BotDbContext>() ?? throw new Exception("DbContext not found in service provider");
+            //var db = BotDbContext
             db.MessageRecords.Add(MessageRecord.FromEvent(e));
             db.SaveChanges();
 
