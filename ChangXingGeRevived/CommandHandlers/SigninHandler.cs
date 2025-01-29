@@ -30,18 +30,18 @@ public class SigninHandler : ICommandHandler
     public async Task HandleGroupAsync(BotContext bot, GroupMessageEvent e, string[] args)
     {
         var todaySignin = _db.SigninRecords.AsNoTracking()
-            .Where(x => x.GroupId == e.Chain.GroupUin&& x.SenderId == e.Chain.TargetUin && x.Time.Date == DateTime.Today);
+            .Where(x => x.GroupId == e.Chain.GroupUin&& x.SenderId == e.Chain.GroupMemberInfo.Uin && x.Time.Date == DateTime.Today);
         if (todaySignin.Any())
         {
             await e.ReplyAsync(bot, "你今天签过到啦~试试在其他群签到吧~\n(๑╹◡╹)ﾉ\"\"\"");
         }
         else
         {
-            _db.SigninRecords.Add(new() { GroupId = (ulong)e.Chain.GroupUin, SenderId = e.Chain.TargetUin, SenderName = e.Chain.GroupMemberInfo.MemberName, Time = DateTime.Now });
+            _db.SigninRecords.Add(new() { GroupId = (ulong)e.Chain.GroupUin, SenderId = e.Chain.GroupMemberInfo.Uin, SenderName = e.Chain.GroupMemberInfo.MemberName, Time = DateTime.Now });
             await _db.SaveChangesAsync();
             var todaySigninCount = await _db.SigninRecords.AsNoTracking().Where(x => x.Time.Date == DateTime.Today).CountAsync();
             var todayThisGroupSigninCount = await _db.SigninRecords.AsNoTracking().Where(x => x.Time.Date == DateTime.Today && x.GroupId == e.Chain.GroupUin).CountAsync();
-            var thisGroupSelfSigninDates = await _db.SigninRecords.AsNoTracking().Where(x => x.SenderId == e.Chain.TargetUin && x.GroupId == e.Chain.GroupUin).Select(x => x.Time).ToListAsync();
+            var thisGroupSelfSigninDates = await _db.SigninRecords.AsNoTracking().Where(x => x.SenderId == e.Chain.GroupMemberInfo.Uin && x.GroupId == e.Chain.GroupUin).Select(x => x.Time).ToListAsync();
             thisGroupSelfSigninDates.Reverse(); // 祖宗之Reverse不可变（可能是放一起会调用IEnumerable<>.Reverse
             var thisGroupSelfSigninTotalCount = thisGroupSelfSigninDates.Count();
             var thisGroupSelfConsecutiveSigninCount = 1;
