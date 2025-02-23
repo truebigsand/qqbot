@@ -31,6 +31,7 @@ public class Program
         builder.Services.AddTransient<PersonalMessageRanksHandler>();
         builder.Services.AddTransient<SigninHandler>();
         builder.Services.AddTransient<TestHandler>();
+        builder.Services.AddTransient<DeepSeekHandler>();
 
         builder.Services.AddDbContext<BotDbContext>((provider, optionsBuilder) =>
         {

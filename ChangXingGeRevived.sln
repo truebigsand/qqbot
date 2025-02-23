@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChangXingGeRevived", "ChangXingGeRevived\ChangXingGeRevived.csproj", "{B5B0B557-8E2F-4B26-AAC5-D2DD8788479B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChangXingGeRevived", "ChangXingGeRevived\ChangXingGeRevived.csproj", "{B5B0B557-8E2F-4B26-AAC5-D2DD8788479B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Lagrange.Core", "Lagrange.Core\Lagrange.Core\Lagrange.Core.csproj", "{2679F0FF-EA09-4528-B72A-4A46DC2261DB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{B5B0B557-8E2F-4B26-AAC5-D2DD8788479B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B5B0B557-8E2F-4B26-AAC5-D2DD8788479B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B5B0B557-8E2F-4B26-AAC5-D2DD8788479B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2679F0FF-EA09-4528-B72A-4A46DC2261DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2679F0FF-EA09-4528-B72A-4A46DC2261DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2679F0FF-EA09-4528-B72A-4A46DC2261DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2679F0FF-EA09-4528-B72A-4A46DC2261DB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
